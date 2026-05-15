@@ -1,0 +1,51 @@
+# Willow — Guardrails: URLs e Domínios Bloqueados
+# A Willow verificará esta lista antes de abrir qualquer URL no navegador.
+# Use padrões de domínio (sem http/https).
+
+blocked_domains:
+  # --- Conteúdo Adulto ---
+  - pattern: "pornhub.com"
+    category: "adulto"
+  - pattern: "xvideos.com"
+    category: "adulto"
+  - pattern: "xnxx.com"
+    category: "adulto"
+  - pattern: "xhamster.com"
+    category: "adulto"
+  - pattern: "redtube.com"
+    category: "adulto"
+  - pattern: "onlyfans.com"
+    category: "adulto"
+
+  # --- Pirataria e Downloads Ilegais ---
+  - pattern: "thepiratebay"
+    category: "pirataria"
+  - pattern: "1337x"
+    category: "pirataria"
+  - pattern: "rarbg"
+    category: "pirataria"
+  - pattern: "torrentz"
+    category: "pirataria"
+
+  # --- Hacking e Exploits ---
+  - pattern: "exploit-db.com"
+    category: "hacking"
+  - pattern: "shodan.io"
+    category: "hacking"
+
+blocked_keywords_in_url:
+  # Palavras-chave que, se aparecerem na URL, devem gerar um bloqueio.
+  - "phishing"
+  - "hack"
+  - "crack"
+  - "keygen"
+  - "warez"
+  - "torrent"
+
+security_rules:
+  # Bloquear qualquer URL que não use HTTPS (exceto localhost para desenvolvimento)
+  block_http: true
+  allow_http_exceptions:
+    - "localhost"
+    - "127.0.0.1"
+    - "0.0.0.0"

@@ -1,0 +1,81 @@
+# Willow — Guardrails: Comandos Bloqueados no Terminal
+# Estes comandos NUNCA poderão ser executados pela Willow no CMD ou PowerShell.
+# O módulo de segurança deve verificar esta lista antes de executar qualquer comando.
+
+blocked_commands:
+  # --- Destruição de Dados ---
+  - pattern: "format"
+    reason: "Pode formatar discos e destruir todos os dados."
+  - pattern: "del /s"
+    reason: "Deletar recursivamente arquivos de pastas inteiras."
+  - pattern: "del /q"
+    reason: "Deletar arquivos sem confirmação."
+  - pattern: "rmdir /s"
+    reason: "Remover diretórios inteiros recursivamente."
+  - pattern: "rd /s"
+    reason: "Alias de rmdir /s - mesmo risco."
+  - pattern: "Remove-Item -Recurse -Force"
+    reason: "PowerShell: deletar pastas inteiras sem confirmação."
+  - pattern: "Clear-Disk"
+    reason: "PowerShell: limpar disco inteiro."
+
+  # --- Alteração de Sistema ---
+  - pattern: "net user"
+    reason: "Criar, deletar ou alterar senhas de usuários do Windows."
+  - pattern: "net localgroup"
+    reason: "Alterar grupos de permissão de usuários."
+  - pattern: "reg delete"
+    reason: "Deletar chaves do Registro do Windows (pode quebrar o sistema)."
+  - pattern: "reg add"
+    reason: "Adicionar chaves ao Registro (pode instalar malware persistente)."
+  - pattern: "bcdedit"
+    reason: "Alterar configurações de boot do Windows."
+  - pattern: "diskpart"
+    reason: "Gerenciador de discos - pode apagar partições."
+  - pattern: "sfc /scannow"
+    reason: "Altera arquivos do sistema (permitir apenas com aprovação manual)."
+
+  # --- Rede e Acesso Remoto ---
+  - pattern: "netsh"
+    reason: "Alterar configurações de rede e firewall."
+  - pattern: "Enable-PSRemoting"
+    reason: "Habilitar acesso remoto ao computador via PowerShell."
+  - pattern: "Set-ExecutionPolicy Unrestricted"
+    reason: "Desabilitar proteção de execução de scripts no PowerShell."
+
+  # --- Download e Execução de Código ---
+  - pattern: "Invoke-WebRequest"
+    reason: "Baixar arquivos da internet (potencial para baixar malware)."
+  - pattern: "curl"
+    reason: "Baixar arquivos da internet (potencial para baixar malware)."
+  - pattern: "wget"
+    reason: "Baixar arquivos da internet (potencial para baixar malware)."
+  - pattern: "Invoke-Expression"
+    reason: "Executar código arbitrário - alto risco de injeção."
+  - pattern: "iex"
+    reason: "Alias de Invoke-Expression - mesmo risco."
+
+  # --- Desligamento ---
+  - pattern: "shutdown"
+    reason: "Desligar ou reiniciar o computador (permitir apenas com aprovação verbal)."
+  - pattern: "Restart-Computer"
+    reason: "PowerShell: reiniciar o computador."
+  - pattern: "Stop-Computer"
+    reason: "PowerShell: desligar o computador."
+
+# Comandos PERMITIDOS para diagnóstico:
+allowed_diagnostic_commands:
+  - "ping"
+  - "ipconfig"
+  - "dir"
+  - "type"
+  - "tasklist"
+  - "systeminfo"
+  - "whoami"
+  - "hostname"
+  - "Get-Process"
+  - "Get-Service"
+  - "Test-Connection"
+  - "Get-NetIPAddress"
+  - "cls"
+  - "echo"
