@@ -13,6 +13,7 @@ Dependencias:
 import logging
 import logging
 import os
+import sys
 import tempfile
 import asyncio
 import time
@@ -113,8 +114,12 @@ class AudioEngine:
         
     async def _generate_wav(self, text: str, output_file: str) -> None:
         """Usa subprocess para chamar a CLI do edge-tts e gerar um WAV garantido."""
+        # Acha o executavel do edge-tts dentro do ambiente virtual atual
+        python_dir = os.path.dirname(sys.executable)
+        edge_tts_path = os.path.join(python_dir, "edge-tts")
+        
         # A CLI gera headers RIFF corretos, a API Python as vezes falha com PCM
-        cmd = f'edge-tts --voice "{self.tts_voice}" --text "{text}" --rate="{self.tts_rate}" --format "riff-24khz-16bit-mono-pcm" --write-media "{output_file}"'
+        cmd = f'"{edge_tts_path}" --voice "{self.tts_voice}" --text "{text}" --rate="{self.tts_rate}" --format "riff-24khz-16bit-mono-pcm" --write-media "{output_file}"'
         proc = await asyncio.create_subprocess_shell(cmd)
         await proc.communicate()
 
