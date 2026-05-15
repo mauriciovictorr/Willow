@@ -17,11 +17,11 @@ import sys
 import tempfile
 import asyncio
 import time
+import ctypes
 import sounddevice as sd
 import numpy as np
 import speech_recognition as sr
 import edge_tts
-import winsound
 
 logger = logging.getLogger("willow.audio")
 
@@ -93,35 +93,14 @@ class AudioEngine:
             logger.error("Falha ao acessar microfone para calibracao: %s", e)
 
     async def _async_speak(self, text: str) -> str:
-        """Gera e salva o audio do Edge TTS assincronamente em formato WAV nativo."""
+        """Gera e salva o audio do Edge TTS assincronamente em formato MP3."""
         communicate = edge_tts.Communicate(text, self.tts_voice, rate=self.tts_rate)
         
         temp_dir = tempfile.gettempdir()
-        temp_file = os.path.join(temp_dir, "willow_speech.wav")
+        temp_file = os.path.join(temp_dir, "willow_speech.mp3")
         
-        # Gera WAV pcm (16-bit) para compatibilidade com winsound
-        with open(temp_file, "wb") as file:
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    file.write(chunk["data"])
-                    
-        # Edge TTS raw PCM requires headers, but saving with --format does it automatically?
-        # A forma mais estavel pela API Python para ter headers WAV é usar subprocess ou aiofiles, 
-        # mas como estamos chamando save(), podemos apenas usar o edge_tts padrao.
-        # Wait, the stream method above doesn't add wav headers.
-        # Vamos usar a CLI interna ou apenas o save() padrao.
+        await communicate.save(temp_file)
         return temp_file
-        
-    async def _generate_wav(self, text: str, output_file: str) -> None:
-        """Usa subprocess para chamar a CLI do edge-tts e gerar um WAV garantido."""
-        # Acha o executavel do edge-tts dentro do ambiente virtual atual
-        python_dir = os.path.dirname(sys.executable)
-        edge_tts_path = os.path.join(python_dir, "edge-tts")
-        
-        # A CLI gera headers RIFF corretos, a API Python as vezes falha com PCM
-        cmd = f'"{edge_tts_path}" --voice "{self.tts_voice}" --text "{text}" --rate="{self.tts_rate}" --format "riff-24khz-16bit-mono-pcm" --write-media "{output_file}"'
-        proc = await asyncio.create_subprocess_shell(cmd)
-        await proc.communicate()
 
     def listen(self) -> str | None:
         """Escuta o microfone e retorna o texto transcrito.
@@ -137,7 +116,9 @@ class AudioEngine:
                 volume_norm = np.linalg.norm(indata) * 10
                 if volume_norm > self.barge_in_threshold:
                     logger.warning("Interrupcao detectada! (Vol: %.1f)", volume_norm)
-                    winsound.PlaySound(None, winsound.SND_PURGE) # Cala a boca
+                    # Corta o audio usando MCI
+                    ctypes.windll.winmm.mciSendStringW("stop willow_voice", None, 0, None)
+                    ctypes.windll.winmm.mciSendStringW("close willow_voice", None, 0, None)
                     interrupted = True
                     raise sd.CallbackStop()
 
@@ -186,31 +167,27 @@ class AudioEngine:
             return None
 
     def speak(self, text: str) -> None:
-        """Fala o texto de forma assincrona (nao bloqueante)."""
+        """Fala o texto de forma assincrona (nao bloqueante) usando MCI."""
         if not text:
             return
 
         logger.info("Falando: '%s'", text)
         try:
-            temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(temp_dir, "willow_speech.wav")
+            # Roda o gerador de audio assincrono
+            temp_audio_file = asyncio.run(self._async_speak(text))
             
-            # Garante que nao tem arquivo sujo
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except OSError:
-                    pass
-
-            # Gera o WAV usando a CLI interna do edge-tts para headers corretos
-            asyncio.run(self._generate_wav(text, temp_file))
+            # Fecha se ja tiver um tocando
+            ctypes.windll.winmm.mciSendStringW("close willow_voice", None, 0, None)
             
-            # Toca assincronamente pelo Windows
-            winsound.PlaySound(temp_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            # Toca assincronamente pelo Windows MCI (Media Control Interface)
+            open_cmd = f'open "{temp_audio_file}" type mpegvideo alias willow_voice'
+            ctypes.windll.winmm.mciSendStringW(open_cmd, None, 0, None)
+            ctypes.windll.winmm.mciSendStringW("play willow_voice", None, 0, None)
+            
             self.is_speaking = True
             
         except Exception as e:
-            logger.error("Erro no Edge TTS/Winsound: %s", e)
+            logger.error("Erro no Edge TTS/MCI: %s", e)
             self.is_speaking = False
 
     @staticmethod
