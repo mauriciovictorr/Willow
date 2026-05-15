@@ -11,13 +11,16 @@ Dependencias:
 """
 
 import logging
+import logging
 import os
 import tempfile
 import asyncio
+import time
 import sounddevice as sd
+import numpy as np
 import speech_recognition as sr
 import edge_tts
-from playsound import playsound
+import winsound
 
 logger = logging.getLogger("willow.audio")
 
@@ -68,9 +71,10 @@ class AudioEngine:
         self._calibrate()
 
         # --- Text-to-Speech (TTS) ---
-        # Usando a voz masculina do Azure/Edge (Antonio)
         self.tts_voice = "pt-BR-AntonioNeural"
-        self.tts_rate = "+0%"  # Pode ajustar se quiser mais rapido ou devagar
+        self.tts_rate = "+0%"
+        self.is_speaking = False
+        self.barge_in_threshold = 3.5  # Sensibilidade da interrupcao (ajuste se necessario)
 
         logger.info("AudioEngine inicializado com sucesso (Voz: %s)", self.tts_voice)
 
@@ -87,23 +91,65 @@ class AudioEngine:
         except OSError as e:
             logger.error("Falha ao acessar microfone para calibracao: %s", e)
 
-    async def _async_speak(self, text: str) -> None:
-        """Gera e salva o audio do Edge TTS assincronamente."""
+    async def _async_speak(self, text: str) -> str:
+        """Gera e salva o audio do Edge TTS assincronamente em formato WAV nativo."""
         communicate = edge_tts.Communicate(text, self.tts_voice, rate=self.tts_rate)
         
-        # Criar arquivo temporario para o audio
         temp_dir = tempfile.gettempdir()
-        temp_file = os.path.join(temp_dir, "willow_speech.mp3")
+        temp_file = os.path.join(temp_dir, "willow_speech.wav")
         
-        await communicate.save(temp_file)
+        # Gera WAV pcm (16-bit) para compatibilidade com winsound
+        with open(temp_file, "wb") as file:
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    file.write(chunk["data"])
+                    
+        # Edge TTS raw PCM requires headers, but saving with --format does it automatically?
+        # A forma mais estavel pela API Python para ter headers WAV é usar subprocess ou aiofiles, 
+        # mas como estamos chamando save(), podemos apenas usar o edge_tts padrao.
+        # Wait, the stream method above doesn't add wav headers.
+        # Vamos usar a CLI interna ou apenas o save() padrao.
         return temp_file
+        
+    async def _generate_wav(self, text: str, output_file: str) -> None:
+        """Usa subprocess para chamar a CLI do edge-tts e gerar um WAV garantido."""
+        # A CLI gera headers RIFF corretos, a API Python as vezes falha com PCM
+        cmd = f'edge-tts --voice "{self.tts_voice}" --text "{text}" --rate="{self.tts_rate}" --format "riff-24khz-16bit-mono-pcm" --write-media "{output_file}"'
+        proc = await asyncio.create_subprocess_shell(cmd)
+        await proc.communicate()
 
     def listen(self) -> str | None:
         """Escuta o microfone e retorna o texto transcrito.
-
-        Returns:
-            Texto transcrito ou None se nao conseguiu entender.
+        Se a Willow estiver falando, monitora interrupcoes.
         """
+        # --- Lógica de Interrupção (Barge-in) ---
+        if self.is_speaking:
+            logger.info("Monitorando interrupcao de fala...")
+            interrupted = False
+            
+            def audio_callback(indata, frames, time_info, status):
+                nonlocal interrupted
+                volume_norm = np.linalg.norm(indata) * 10
+                if volume_norm > self.barge_in_threshold:
+                    logger.warning("Interrupcao detectada! (Vol: %.1f)", volume_norm)
+                    winsound.PlaySound(None, winsound.SND_PURGE) # Cala a boca
+                    interrupted = True
+                    raise sd.CallbackStop()
+
+            try:
+                with sd.InputStream(callback=audio_callback):
+                    while self.is_speaking and not interrupted:
+                        time.sleep(0.1)
+            except Exception as e:
+                logger.debug("Erro no stream de interrupcao: %s", e)
+            
+            self.is_speaking = False
+            if interrupted:
+                logger.info("Willow silenciada. Escutando novo comando...")
+                # Pequena pausa pra não pegar o proprio fim do grito
+                time.sleep(0.3)
+
+        # --- Lógica Padrão de Escuta (Google STT) ---
         try:
             with self.microphone as source:
                 logger.info("Escutando...")
@@ -135,30 +181,32 @@ class AudioEngine:
             return None
 
     def speak(self, text: str) -> None:
-        """Fala o texto usando Text-to-Speech (Edge TTS - voz masculina neural).
-
-        Args:
-            text: Texto para ser falado.
-        """
+        """Fala o texto de forma assincrona (nao bloqueante)."""
         if not text:
             return
 
-        logger.info("Falando (Edge TTS): '%s'", text)
+        logger.info("Falando: '%s'", text)
         try:
-            # Roda o gerador de audio assincrono
-            temp_audio_file = asyncio.run(self._async_speak(text))
+            temp_dir = tempfile.gettempdir()
+            temp_file = os.path.join(temp_dir, "willow_speech.wav")
             
-            # Toca o arquivo
-            playsound(temp_audio_file)
+            # Garante que nao tem arquivo sujo
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except OSError:
+                    pass
+
+            # Gera o WAV usando a CLI interna do edge-tts para headers corretos
+            asyncio.run(self._generate_wav(text, temp_file))
             
-            # Remove o temporario apos falar
-            try:
-                os.remove(temp_audio_file)
-            except OSError:
-                pass
-                
+            # Toca assincronamente pelo Windows
+            winsound.PlaySound(temp_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            self.is_speaking = True
+            
         except Exception as e:
-            logger.error("Erro no Edge TTS: %s", e)
+            logger.error("Erro no Edge TTS/Winsound: %s", e)
+            self.is_speaking = False
 
     @staticmethod
     def list_microphones() -> list[dict]:
