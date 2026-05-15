@@ -1,25 +1,22 @@
-# Willow — Dependências Python
+# Willow — Dependencias Python
 # Instale com: pip install -r requirements.txt
 
-# --- Core: Áudio e Voz ---
+# --- Core: Audio e Voz ---
 SpeechRecognition>=3.10.0
 PyAudioWPatch>=0.2.12      # Fork do PyAudio compativel com Python 3.14+
 sounddevice>=0.4.6
-soundfile>=0.12.1
-pyttsx3>=2.90
+numpy>=1.24.0              # Processamento de audio (barge-in)
 edge-tts>=7.2.8            # Vozes neurais premium da Microsoft
-playsound==1.2.2           # Playback de MP3 (Edge TTS)
 
 # --- Core: IA e LLMs ---
-google-generativeai>=0.5.0
-# openai>=1.0.0           # Descomentar se usar OpenAI/Claude
+requests>=2.31.0           # Comunicacao HTTP com API do Ollama
+# openai>=1.0.0            # Descomentar se usar OpenAI/Claude
 
-# --- Automação do Windows ---
+# --- Automacao do Windows ---
 pyautogui>=0.9.54
 
-# --- Guardrails e Segurança ---
+# --- Guardrails e Seguranca ---
 pyyaml>=6.0
 
-# --- Utilitários ---
+# --- Utilitarios ---
 python-dotenv>=1.0.0
-requests>=2.31.0           # Comunicacao HTTP com API do Ollama

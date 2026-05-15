@@ -15,28 +15,26 @@ Willow e uma assistente virtual controlada por voz, construida em Python, capaz 
 ```
 willow/
 ├── agents/                    # Perfis dos agentes de IA da equipe
-│   ├── ada.md                 # Backend, Python, IA e Automação
+│   ├── ada.md                 # Backend, Python, IA e Automacao
 │   ├── zane.md                # Frontend, UI/UX e Design
 │   ├── turing.md              # QA, Debugging e DevOps
-│   └── cipher.md              # Cibersegurança e Guardrails
-├── guardrails/                # Regras de segurança (dados)
+│   └── cipher.md              # Ciberseguranca e Guardrails
+├── guardrails/                # Regras de seguranca (dados)
 │   ├── blocked_commands.yaml  # Comandos de terminal proibidos
-│   └── blocked_urls.yaml      # Sites e domínios bloqueados
-├── src/                       # Código-fonte Python
-│   ├── core/                  # Módulos principais
-│   │   ├── audio_engine.py    # Captura de áudio e Text-to-Speech
-│   │   ├── brain.py           # Conexão com LLMs (Gemini/Claude)
-│   │   └── router.py          # Roteador de intenções
-│   └── actions/               # Ações que a Willow pode executar
-│       ├── system.py          # Abrir apps, volume, terminal
-│       └── browser.py         # Abrir sites, pesquisar na web
-├── tests/                     # Testes automatizados
+│   └── blocked_urls.yaml      # Sites e dominios bloqueados
+├── src/                       # Codigo-fonte Python
+│   ├── core/                  # Modulos principais
+│   │   ├── audio_engine.py    # Captura de audio, TTS e barge-in
+│   │   └── brain.py           # Conexao com Ollama (IA local)
+│   └── actions/               # Acoes que a Willow pode executar (planejado)
+├── tests/                     # Testes e scripts de experimentacao
 ├── main.py                    # Ponto de entrada principal
-├── requirements.txt           # Dependências Python
-├── .env.example               # Modelo de variáveis de ambiente
-├── REGRAS.md                  # Regras de operação da equipe de IA
+├── requirements.txt           # Dependencias Python
+├── .env.example               # Modelo de variaveis de ambiente
+├── REGRAS.md                  # Regras de operacao da equipe de IA
 └── README.md                  # Este arquivo
 ```
+
 
 ## Instalacao
 
